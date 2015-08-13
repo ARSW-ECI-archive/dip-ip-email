@@ -1,8 +1,10 @@
 package edu.eci.arsw;
 
+import edu.eci.arsw.util.Maybe;
 import java.awt.EventQueue;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.time.Clock;
 import java.util.Properties;
 import java.util.regex.Pattern;
 
@@ -97,34 +99,83 @@ public class MailClient extends JFrame {
 		
 		final WordAssistant sc=new WordAssistant();
 		
-		body.addCaretListener(new CaretListener() {
+                /*
+                body.getDocument().addDocumentListener(new DocumentListener() {
+
+                    @Override
+                    public void insertUpdate(DocumentEvent e) {
+                        update(e);
+                    }
+
+                    @Override
+                    public void removeUpdate(DocumentEvent e) {
+                        update(e);
+                    }
+
+                    @Override
+                    public void changedUpdate(DocumentEvent e) {
+                        update(e);
+                    }
+                    
+                    private void update(DocumentEvent e) {
+                        DocumentEvent.EventType type = e.getType();
+                        DocumentEvent.ElementChange change = e.getChange();
+                        String cnt=body.getText();
+                        int lastspace=cnt.lastIndexOf(" ", pos);
+                        final String word;
+                        if (lastspace==-1){
+                           word=cnt.substring(0,pos);	
+                        }
+                        else {
+                                word=cnt.substring(lastspace+1,pos);	
+                        }
+                        final Maybe<String> replacement=sc.check(word);
+                        System.err.println("Pos: "+pos+" lastspace: "+lastspace+" word: "+word+" -> "+replacement+" " +cnt);
+
+                        if (replacement.isJust()){
+                                // final String _word=word;
+                                // final Maybe<String> _replacement=replacement;
+                                SwingUtilities.invokeLater(new Runnable()
+                                {
+                                    @Override
+                                    public void run(){
+                                        body.setText(body.getText().replace("\b"+word+"\b", replacement.getValue()));
+                                    }
+                                });
+                        }								
+                        
+                    }
+                }
+                );
+                */
+
+                body.addCaretListener(new CaretListener() {
 			
 			@Override
 			public void caretUpdate(CaretEvent e) {
 				int pos=e.getDot();
 				String cnt=body.getText();
 				int lastspace=cnt.lastIndexOf(" ", pos);
-				String word=null;
+				final String word;
 				if (lastspace==-1){
-					word=cnt.substring(0,pos);	
+			           word=cnt.substring(0,pos);	
 				}
-				else{
+                                else {
 					word=cnt.substring(lastspace+1,pos);	
 				}
-				String replacement=sc.check(word);
+                                final Maybe<String> replacement=sc.check(word);
 				
-				if (replacement!=null){
-					final String _word=word;
-					final String _replacement=replacement;
+				if (replacement.isJust()){
+					// final String _word=word;
+					// final Maybe<String> _replacement=replacement;
 					SwingUtilities.invokeLater(new Runnable()
 					{
-						public void run(){
-							body.setText(body.getText().replace(_word, _replacement));
-						}
+                                            @Override
+					    public void run(){
+						body.setText(body.getText().replace("\b"+word+"\b", replacement.getValue()));
+					    }
 					});
-				}
-
-								
+				}								
 			}
 		});
 		
@@ -139,15 +190,15 @@ public class MailClient extends JFrame {
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				String msg = body.getText();
-				if (!Pattern.compile("Buen(a|o)s( )*(dias|tardes|noches)*")
+				if (!Pattern.compile("^Buen(a|o)s( )*(dias|tardes|noches)*")
 						.matcher(msg).find()) {
 					msg = "Buen día!,\n" + msg;
 				}
 
 				if (!Pattern
-						.compile("(Cordialmente|Atentamente|Saludos|Con gusto)")
-						.matcher(msg).find()) {
-					msg = msg + "Atentamente, Juan Perez";
+					.compile("(Cordialmente|Atentamente|Saludos|Con gusto)")
+					.matcher(msg).find()) {
+				    msg = msg + "Atentamente, Juan Perez";
 				}
 
 				Properties props = new Properties();

@@ -7,15 +7,14 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import com.google.gson.Gson;
+import edu.eci.arsw.util.Maybe;
 
 public class LinguisticDataSource {
 
-	private static Map<String,String> equivalencesMap;
-	private static Set<String> wordList;
+	final private static Map<String,String> equivalencesMap;
 	
 	static{		
-		equivalencesMap=new LinkedHashMap<String,String>();
-		wordList=new LinkedHashSet<String>();
+		equivalencesMap=new LinkedHashMap<>();
 		
 		equivalencesMap.put("hoal", "hola");
 		equivalencesMap.put("yola", "hola");
@@ -24,26 +23,22 @@ public class LinguisticDataSource {
 		equivalencesMap.put("vuenas", "buenas");
 		equivalencesMap.put("nuenas", "buenas");
 		equivalencesMap.put("huenas", "buenas");
-		
-		for (Entry<String,String> e:equivalencesMap.entrySet()){
-			wordList.add(e.getValue());
-		}
-		
+				
 	}
 	
-	public String getEquivalences(String origw){
-		String res=equivalencesMap.get(origw);
+	public Maybe<String> getEquivalences(String origw){
+		String res = equivalencesMap.get(origw);
 		if (res==null){
-			return null;
+		   return Maybe.getNothing();
 		}
 		else{
-			return res;
+		   return Maybe.Just(res);
 		}
 	}
 	
 
 	public Set<String> getWordList(){
-		return wordList;
+		return equivalencesMap.keySet();
 	}
 	
 	

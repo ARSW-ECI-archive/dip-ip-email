@@ -1,5 +1,7 @@
 package edu.eci.arsw;
 
+import edu.eci.arsw.util.Maybe;
+
 
 public class WordAssistant {
 
@@ -11,8 +13,8 @@ public class WordAssistant {
 	 * @param word
 	 * @return
 	 */
-	public String check(String word){
-		String equiv=lds.getEquivalences(word);
+	public Maybe<String> check(String word){
+		Maybe<String> equiv=lds.getEquivalences(word);
 		
 		return equiv;
 		
