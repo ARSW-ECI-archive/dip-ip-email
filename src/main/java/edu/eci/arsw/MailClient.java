@@ -22,19 +22,28 @@ import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.text.Document;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
+import javax.swing.JTextPane;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.CaretEvent;
 import javax.swing.event.CaretListener;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.text.AbstractDocument;
+import javax.swing.text.AttributeSet;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.DefaultStyledDocument;
+import javax.swing.text.DocumentFilter;
+import org.w3c.dom.stylesheets.DocumentStyle;
 
 public class MailClient extends JFrame {
 
 	private static final String SMTP_HOST_NAME = "smtp.gmail.com";
 	private static final int SMTP_HOST_PORT = 465;
+        private static final int TEXT_LENGTH_AREA = 20;
 
 	private JPanel contentPane;
 	private JTextField recipients;
@@ -59,6 +68,21 @@ public class MailClient extends JFrame {
 		});
 	}
 
+        public boolean isDelim(char c) {
+            boolean result;
+            switch(c) {
+                case ' ':
+                case '\t':
+                case '\n':
+                case '\r':
+                    result = true;
+                    break;
+                default:
+                    result = false;
+                    break;
+            }
+            return result;
+        }
 	/**
 	 * Create the frame.
 	 */
@@ -94,13 +118,73 @@ public class MailClient extends JFrame {
 		contentPane.add(bodySp);
 
 		body = new JTextArea();
-		bodySp.setViewportView(body);
+                final Document document = body.getDocument();
+
 
 		
 		final WordAssistant sc=new WordAssistant();
 		
+                DocumentFilter docFilter = new DocumentFilter() {
+
+                    @Override
+                    public void insertString(DocumentFilter.FilterBypass fb, int offset, String string, AttributeSet attr) throws BadLocationException {
+                        System.err.println("Insert: " + string + " ["+offset+"]");
+                        super.insertString(fb, offset, string, attr); 
+                    }
+
+                    @Override
+                    public void remove(DocumentFilter.FilterBypass fb, int offset, int length) throws BadLocationException {
+                        System.err.println("Remove: "+offset+" "+length);
+                        super.remove(fb, offset, length); //To change body of generated methods, choose Tools | Templates.
+                    }
+
+                    @Override
+                    public void replace(DocumentFilter.FilterBypass fb, int offset, int length, String text, AttributeSet attrs) throws BadLocationException {
+                        if (!text.trim().equals("")) {
+                            int p = Math.max(offset - TEXT_LENGTH_AREA,0);
+                            int q = Math.min(document.getLength()-offset,TEXT_LENGTH_AREA);
+                        
+                            String prefix = document.getText(p, offset - p);
+                            String suffix = document.getText(offset, q);                            String area = prefix+text+suffix;
+                     
+                            int lp = prefix.length();
+                            while(lp > 0 && !isDelim(prefix.charAt(lp-1))) {
+                                lp--;
+                            }
+                            int p1 = lp;
+                            int ls = 0;
+                            while(ls < suffix.length() && !isDelim(prefix.charAt(lp-1))) {
+                                ls++;
+                            }
+                            int q1 = ls;
+                            String wPrefix = prefix.substring(p1);
+                            String wSuffix = suffix.substring(0, q1);
+                            String word = wPrefix + text + wSuffix; 
+                            System.err.println("Recognized : "+word+ " ["+lp+","+p1+","+ls+","+q1+"]");
+                            
+                            Maybe<String> mRep = sc.check(word);
+                            if (mRep.isJust()) {
+                                String wRep = mRep.getValue();
+                                System.err.println(">> Replace: "+word+" -> "+wRep+" ["+(offset -wPrefix.length()) +","+word.length()+"]");
+                                fb.replace(offset - wPrefix.length(),word.length()-text.length(),wRep,attrs);
+                            } else { 
+                                super.replace(fb, offset, length, text, attrs); //To change body of generated methods, choose Tools | Templates.
+                            }
+                            System.err.println("Replace: "+text+" ["+offset+","+length+"]");
+                        } else {
+                            super.replace(fb, offset, length, text, attrs);                            
+                        }
+                    }
+                };
+ 
+                if (document instanceof AbstractDocument) {
+                    ((AbstractDocument) document).setDocumentFilter(docFilter);
+                }
+                
+                bodySp.setViewportView(body);
+
                 /*
-                body.getDocument().addDocumentListener(new DocumentListener() {
+                DocumentListener docListener = new DocumentListener() {
 
                     @Override
                     public void insertUpdate(DocumentEvent e) {
@@ -117,38 +201,43 @@ public class MailClient extends JFrame {
                         update(e);
                     }
                     
+                    synchronized 
                     private void update(DocumentEvent e) {
                         DocumentEvent.EventType type = e.getType();
-                        DocumentEvent.ElementChange change = e.getChange();
-                        String cnt=body.getText();
-                        int lastspace=cnt.lastIndexOf(" ", pos);
-                        final String word;
-                        if (lastspace==-1){
-                           word=cnt.substring(0,pos);	
-                        }
-                        else {
-                                word=cnt.substring(lastspace+1,pos);	
-                        }
-                        final Maybe<String> replacement=sc.check(word);
-                        System.err.println("Pos: "+pos+" lastspace: "+lastspace+" word: "+word+" -> "+replacement+" " +cnt);
-
-                        if (replacement.isJust()){
-                                // final String _word=word;
-                                // final Maybe<String> _replacement=replacement;
-                                SwingUtilities.invokeLater(new Runnable()
-                                {
-                                    @Override
-                                    public void run(){
-                                        body.setText(body.getText().replace("\b"+word+"\b", replacement.getValue()));
-                                    }
-                                });
-                        }								
                         
-                    }
-                }
-                );
-                */
+                        int pos = body.getCaretPosition();
+                        
+                        String cnt= body.getText();
+                        
+                        int lastspace=cnt.lastIndexOf(" ", pos);
+                        
+                        int initialPos = (lastspace == -1)?0:lastspace+1;
+                        final String word;
+                        
+                        System.err.print("Pos: "+pos+" lastspace: "+lastspace+" " +cnt);
 
+                        if (initialPos < pos) {
+                            word=cnt.substring(initialPos,pos);	
+                        
+                            final Maybe<String> replacement=sc.check(word);
+                            System.err.println(" word: "+word+" -> "+replacement);
+
+                            if (replacement.isJust()){
+                                    // final String _word=word;
+                                    // final Maybe<String> _replacement=replacement;
+                                String text= body.getText();
+                                String newText = text.replace("\b"+word+"\b", replacement.getValue());
+                                int posF = pos + newText.length() - text.length();
+                                body.setText(newText);
+                                body.setCaretPosition(posF);
+                            }								
+                        }
+                    }
+                };
+                
+                document.addDocumentListener(docListener);
+                */
+                /*
                 body.addCaretListener(new CaretListener() {
 			
 			@Override
@@ -164,6 +253,7 @@ public class MailClient extends JFrame {
 					word=cnt.substring(lastspace+1,pos);	
 				}
                                 final Maybe<String> replacement=sc.check(word);
+                                System.err.println("Pos: "+pos+" lastspace: "+lastspace+" word: "+word+" -> "+replacement+" " +cnt);
 				
 				if (replacement.isJust()){
 					// final String _word=word;
@@ -178,6 +268,7 @@ public class MailClient extends JFrame {
 				}								
 			}
 		});
+                */
 		
 		JButton btnSendEmail = new JButton("Send email");
 		btnSendEmail.setBounds(233, 397, 117, 29);
